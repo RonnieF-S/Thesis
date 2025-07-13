@@ -1,3 +1,15 @@
+/*
+ * Heltec WiFi LoRa 32 V3.2 Firmware
+ * Simple LoRa bridge: UART <-> LoRa RF
+ * 
+ * This firmware acts as a transparent bridge between the Raspberry Pi
+ * and the LoRa radio. It simply forwards data between UART and LoRa.
+ * 
+ * Hardware: Heltec WiFi LoRa 32 V3.2 (ESP32-S3 + SX1262)
+ * Author: Ronnie Fellows-Smith
+ */
+
+#include <Arduino.h>
 #include <RadioLib.h>
 #include "heltec.h"
 #include "HT_SSD1306Wire.h"
@@ -46,93 +58,58 @@ void setup() {
   display.setFont(ArialMT_Plain_16);
   display.setTextAlignment(TEXT_ALIGN_LEFT);
   display.clear();
-  display.drawString(0, 0, "LoRa Bridge");
-  display.drawString(0, 16, "Initializing...");
+  display.drawString(0, 0, "LoRa RX Init...");
   display.display();
 
   if (lora.begin(915.0) == RADIOLIB_ERR_NONE) {
     lora.setSpreadingFactor(9);
-    lora.setBandwidth(125.0);
-    lora.setCodingRate(5);
-    lora.setSyncWord(0x34);  // Private sync word
-    
-    // Start in receive mode
-    lora.startReceive();
-    
-    display.clear();
-    display.drawString(0, 0, "LoRa Bridge");
-    display.drawString(0, 16, "Ready");
-    display.drawString(0, 32, "Waiting...");
-    display.display();
+    display.drawString(0, 20, "LoRa Ready");
   } else {
-    display.clear();
-    display.drawString(0, 0, "LoRa Bridge");
-    display.drawString(0, 16, "FAILED!");
+    display.drawString(0, 20, "LoRa Fail");
     display.display();
     while (true);
   }
+
+  display.display();
 }
 
 void loop() {
-  // Check for incoming serial data from Pi
-  if (Serial.available()) {
-    String outgoingMessage = Serial.readStringUntil('\n');
-    outgoingMessage.trim();
-    
-    if (outgoingMessage.length() > 0) {
-      // Switch to transmit mode
-      lora.standby();
-      delay(5);
-      
-      // Transmit the message from Pi
-      int txState = lora.transmit(outgoingMessage);
-      
-      if (txState == RADIOLIB_ERR_NONE) {
-        // Update display
-        display.clear();
-        display.drawString(0, 0, "TX OK");
-        drawWrappedString(display, outgoingMessage, 0, 16);
-        display.display();
-        delay(100);  // Brief display of TX status
-      }
-      
-      // Return to receive mode
-      lora.startReceive();
+  String incoming;
+  int state = lora.receive(incoming);
+
+  display.clear();
+  if (state == RADIOLIB_ERR_NONE) {
+    Serial.println("[RX OK] " + incoming);
+    display.drawString(0, 0, "RX OK:");
+    drawWrappedString(display, incoming, 0, 20);
+
+    String reply = "Hello World!";
+
+    // Pause and send response
+    lora.standby();   // Switch to standby before sending
+    delay(10);
+    int txState = lora.transmit(reply);
+
+    if (txState == RADIOLIB_ERR_NONE) {
+      Serial.println("[TX OK] " + reply);
+      display.drawString(0, 48, "Reply Sent");
+    } else {
+      Serial.print("[TX FAIL] ");
+      Serial.println(txState);
+      display.drawString(0, 48, "Reply Fail");
     }
-  }
-  
-  // Check for incoming LoRa messages
-  String incomingMessage;
-  int rxState = lora.receive(incomingMessage);
-  
-  if (rxState == RADIOLIB_ERR_NONE) {
-    // Message received successfully - send to Pi via Serial
-    Serial.println(incomingMessage);
-    
-    // Update display
-    display.clear();
-    display.drawString(0, 0, "RX OK");
-    drawWrappedString(display, incomingMessage, 0, 16);
-    display.display();
-    delay(100);  // Brief display of RX status
-    
-  } else if (rxState != RADIOLIB_ERR_RX_TIMEOUT) {
-    // Handle receive errors (but not timeouts)
-    display.clear();
+
+    // Return to receive mode
+    delay(10);
+    lora.startReceive();
+
+  } else if (state != RADIOLIB_ERR_RX_TIMEOUT) {
+    Serial.print("[RX FAIL] ");
+    Serial.println(state);
     display.drawString(0, 0, "RX Error");
-    display.drawString(0, 16, String(rxState));
-    display.display();
-    delay(100);
+  } else {
+    display.drawString(0, 0, "Waiting...");
   }
-  
-  // Update display to show waiting status if no recent activity
-  static unsigned long lastActivity = 0;
-  if (millis() - lastActivity > 1000) {  // Update every second
-    display.clear();
-    display.drawString(0, 0, "LoRa Bridge");
-    display.drawString(0, 16, "Ready");
-    display.drawString(0, 32, "Listening...");
-    display.display();
-    lastActivity = millis();
-  }
+
+  display.display();
 }

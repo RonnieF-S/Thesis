@@ -8,7 +8,7 @@ import time
 import sys
 from datetime import datetime
 
-from sensors.wind_sensor_reader import WindSensorReader
+from ground_station.sensors.wind_vane_reader import WindSensorReader
 from sensors.gps_reader import GPSReader
 from comms.lora_transmitter import LoRaTransmitter
 from logs.logger import GroundStationLogger
