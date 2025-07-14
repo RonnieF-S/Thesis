@@ -15,7 +15,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
 from config import WIND_VANE_PORT, WIND_VANE_BAUDRATE, SENSOR_READ_INTERVAL
 from shared import SimpleLogger as logger
 
-class WindSensorReader:
+class WindVaneReader:
     def __init__(self, port=WIND_VANE_PORT, device_address=1):
         """Initialize wind vane reader for USB RS485 adapter"""
         self.port = port
@@ -166,7 +166,7 @@ class WindSensorReader:
 if __name__ == "__main__":
     try:
         print("=== Wind Vane Reader Test ===")
-        wind_sensor = WindSensorReader('/dev/ttyUSB0')
+        wind_sensor = WindVaneReader('/dev/ttyUSB0')
         
         if wind_sensor.serial_conn:
             print("Wind vane connected. Reading for 30 seconds...")

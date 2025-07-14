@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 try:
     import smbus
 except ImportError:
-    print("Error: smbus not available. Install with: sudo apt install python3-smbus")
+    print("Error: smbus not available.")
     sys.exit(1)
 
 from sensors.compass_calibration import CompassCalibrationManager, CompassCalibrator

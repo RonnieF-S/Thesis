@@ -9,6 +9,9 @@
  * Author: Ronnie Fellows-Smith
  */
 
+// ** IMPORTANT: /.vscode/settings.json contains "C_Cpp.errorSquiggles": "disabled"
+// ** Set to 'enabled' for debugging in VS Code
+
 #include <Arduino.h>
 #include <RadioLib.h>
 #include "heltec.h"
@@ -22,6 +25,12 @@ static SSD1306Wire display(0x3C, 500000, SDA_OLED, SCL_OLED, GEOMETRY_128_64, RS
 #define LORA_RST  12
 #define LORA_BUSY 13
 #define LORA_DIO1 14
+
+// LoRa parameters
+#define LORA_FREQUENCY 915.0 // Frequency in MHz
+#define LORA_BANDWIDTH 125.0 // Bandwidth in kHz
+#define LORA_SPREADING_FACTOR 9 // Spreading factor (7-12)
+#define LORA_CODING_RATE 5 // Coding rate (5-8) 
 
 SX1262 lora = new Module(LORA_CS, LORA_DIO1, LORA_RST, LORA_BUSY);
 
@@ -61,8 +70,10 @@ void setup() {
   display.drawString(0, 0, "LoRa RX Init...");
   display.display();
 
-  if (lora.begin(915.0) == RADIOLIB_ERR_NONE) {
-    lora.setSpreadingFactor(9);
+  if (lora.begin(LORA_FREQUENCY) == RADIOLIB_ERR_NONE) {
+    lora.setSpreadingFactor(LORA_SPREADING_FACTOR);
+    lora.setBandwidth(LORA_BANDWIDTH);
+    lora.setCodingRate(LORA_CODING_RATE);
     display.drawString(0, 20, "LoRa Ready");
   } else {
     display.drawString(0, 20, "LoRa Fail");

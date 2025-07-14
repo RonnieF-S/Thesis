@@ -8,16 +8,19 @@ import time
 import sys
 from datetime import datetime
 
-from ground_station.sensors.wind_vane_reader import WindSensorReader
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
+from ground_station.sensors.wind_vane_reader import WindVaneReader
 from sensors.gps_reader import GPSReader
 from comms.lora_transmitter import LoRaTransmitter
-from logs.logger import GroundStationLogger
+from shared import SimpleLogger as logger
 
 class GroundStationController:
     def __init__(self, use_gps=True):
         """Initialize ground station controller"""
-        self.logger = GroundStationLogger()
-        self.wind_sensor = WindSensorReader()
+        self.wind_sensor = WindVaneReader()
         self.lora = LoRaTransmitter(port='/dev/ttyAMA2')  # UART3 (GPIO4/5)
         
         # GPS setup
@@ -27,9 +30,9 @@ class GroundStationController:
         if self.use_gps:
             try:
                 self.gps = GPSReader(port='/dev/ttyUSB0')
-                self.logger.log_info("GPS reader initialized")
+                logger.info("GPS reader initialized")
             except Exception as e:
-                self.logger.log_warning(f"GPS initialization failed: {e}, using static coordinates")
+                logger.warning(f"GPS initialization failed: {e}, using static coordinates")
                 self.use_gps = False
         
         # Ground station GPS coordinates (static fallback)
@@ -41,7 +44,7 @@ class GroundStationController:
         self.response_timeout = 10.0       # seconds
         self.max_retries = 3
         
-        self.logger.log_info("Ground Station Controller initialized")
+        logger.info("Ground Station Controller initialized")
     
     def get_ground_station_coordinates(self) -> tuple:
         """Get current ground station coordinates (GPS or static)"""
@@ -50,7 +53,7 @@ class GroundStationController:
             if position['valid']:
                 return position['lat'], position['lon']
             else:
-                self.logger.log_warning("GPS fix not available, using static coordinates")
+                logger.warning("GPS fix not available, using static coordinates")
         
         return self.static_lat, self.static_lon
     
@@ -65,24 +68,24 @@ class GroundStationController:
             success = self.lora.send_packet(init_packet)
             
             if success:
-                self.logger.log_communication("TX", init_packet, True)
+                logger.info("TX", init_packet, True)
                 
                 # Wait for UAV acknowledgment
                 response = self.lora.wait_for_response(timeout=self.response_timeout)
                 
                 if response:
-                    self.logger.log_communication("RX", response, True)
-                    self.logger.log_info("INIT packet acknowledged by UAV")
+                    logger.info("RX", response, True)
+                    logger.info("INIT packet acknowledged by UAV")
                     return True
                 else:
-                    self.logger.log_warning("No response to INIT packet")
+                    logger.warning("No response to INIT packet")
                     return False
             else:
-                self.logger.log_error("Failed to send INIT packet")
+                logger.error("Failed to send INIT packet")
                 return False
                 
         except Exception as e:
-            self.logger.log_error(f"Error sending INIT packet: {e}")
+            logger.error(f"Error sending INIT packet: {e}")
             return False
     
     def send_wind_data(self) -> dict:
@@ -112,14 +115,14 @@ class GroundStationController:
                 result['retries'] = attempt
                 
                 if not success:
-                    self.logger.log_error(f"Failed to send wind packet (attempt {attempt + 1})")
+                    logger.error(f"Failed to send wind packet (attempt {attempt + 1})")
                     if attempt < self.max_retries:
                         time.sleep(2)  # Wait before retry
                         continue
                     else:
                         break
                 
-                self.logger.log_communication("TX", wind_packet, True)
+                logger.info("TX", wind_packet, True)
                 
                 # Wait for UAV response
                 response = self.lora.wait_for_response(timeout=self.response_timeout)
@@ -130,7 +133,7 @@ class GroundStationController:
                     result['response_packet'] = response
                     result['round_trip_ms'] = int((end_time - start_time) * 1000)
                     
-                    self.logger.log_communication("RX", response, True)
+                    logger.info("RX", response, True)
                     
                     # Log successful transaction
                     log_entry = {
@@ -143,11 +146,11 @@ class GroundStationController:
                         "round_trip_ms": result['round_trip_ms'],
                         "wind_data": wind_data
                     }
-                    self.logger.log_event(log_entry)
+                    logger.info(log_entry)
                     
                     break
                 else:
-                    self.logger.log_warning(f"No response to wind packet (attempt {attempt + 1})")
+                    logger.warning(f"No response to wind packet (attempt {attempt + 1})")
                     if attempt < self.max_retries:
                         time.sleep(2)  # Wait before retry
             
@@ -163,22 +166,22 @@ class GroundStationController:
                     "round_trip_ms": None,
                     "wind_data": wind_data
                 }
-                self.logger.log_event(log_entry)
+                logger.info(log_entry)
             
         except Exception as e:
-            self.logger.log_error(f"Error in wind data transmission: {e}")
+            logger.error(f"Error in wind data transmission: {e}")
         
         return result
     
     def run(self):
         """Main ground station control loop"""
-        self.logger.log_info("Starting ground station control loop")
+        logger.info("Starting ground station control loop")
         
         try:
             # Send initial packet
             init_success = self.send_init_packet()
             if not init_success:
-                self.logger.log_warning("Failed to initialize communication with UAV")
+                logger.warning("Failed to initialize communication with UAV")
             
             # Main transmission loop
             last_transmission = 0
@@ -201,15 +204,15 @@ class GroundStationController:
                 time.sleep(0.1)
                 
         except KeyboardInterrupt:
-            self.logger.log_info("Ground station stopped by user")
+            logger.info("Ground station stopped by user")
         except Exception as e:
-            self.logger.log_error(f"Ground station control loop error: {e}")
+            logger.error(f"Ground station control loop error: {e}")
         finally:
             self.shutdown()
     
     def shutdown(self):
         """Clean shutdown of ground station"""
-        self.logger.log_info("Shutting down ground station")
+        logger.info("Shutting down ground station")
         
         try:
             self.wind_sensor.close()
@@ -217,7 +220,7 @@ class GroundStationController:
                 self.gps.close()
             self.lora.close()
         except Exception as e:
-            self.logger.log_error(f"Error during shutdown: {e}")
+            logger.error(f"Error during shutdown: {e}")
 
 if __name__ == "__main__":
     controller = GroundStationController()

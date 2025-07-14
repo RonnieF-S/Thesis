@@ -10,17 +10,20 @@ import sys
 import threading
 from datetime import datetime
 
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
 from sensors.sprintir_reader import SprintIRReader
 from comms.lora_responder import LoRaResponder
 from dji_sdk.position_reader import PositionReader
 from dji_sdk.flight_commander import FlightCommander
 from logic.source_localiser import SourceLocaliser
-from logs.logger import UAVLogger
+from shared import SimpleLogger as logger
 
 class UAVController:
     def __init__(self):
         """Initialize UAV controller with all subsystems"""
-        self.logger = UAVLogger()
         self.co2_sensor = SprintIRReader(port='/dev/ttyAMA1')  # UART5 (GPIO12/13)
         self.lora = LoRaResponder(port='/dev/ttyAMA2')         # UART3 (GPIO4/5)
         self.gps = PositionReader()
@@ -28,7 +31,7 @@ class UAVController:
         self.localiser = SourceLocaliser()
         self.running = False
         
-        self.logger.log_info("UAV Controller initialized")
+        logger.info("UAV Controller initialized")
     
     def handle_wind_packet(self, packet_data):
         """Process incoming wind data and respond with UAV telemetry"""
@@ -73,12 +76,12 @@ class UAVController:
                 "response_packet": response,
                 "response_sent": True
             }
-            self.logger.log_event(log_entry)
+            logger.info(log_entry)
             
             return response
             
         except Exception as e:
-            self.logger.log_error(f"Error handling wind packet: {e}")
+            logger.error(f"Error handling wind packet: {e}")
             return None
     
     def handle_init_packet(self, packet_data):
@@ -96,7 +99,7 @@ class UAVController:
             # Store ground station location for source localisation
             self.localiser.set_ground_station_location(ground_lat, ground_lon)
             
-            self.logger.log_info(f"Received ground station location: {ground_lat:.6f}, {ground_lon:.6f}")
+            logger.info(f"Received ground station location: {ground_lat:.6f}, {ground_lon:.6f}")
             
             # Send acknowledgment
             response_timestamp = time.time()
@@ -106,13 +109,13 @@ class UAVController:
             return response
             
         except Exception as e:
-            self.logger.log_error(f"Error handling init packet: {e}")
+            logger.error(f"Error handling init packet: {e}")
             return None
     
     def run(self):
         """Main UAV control loop"""
         self.running = True
-        self.logger.log_info("Starting UAV control loop")
+        logger.info("Starting UAV control loop")
         
         try:
             while self.running:
@@ -127,7 +130,7 @@ class UAVController:
                     elif packet.startswith('INIT'):
                         response = self.handle_init_packet(packet)
                     else:
-                        self.logger.log_warning(f"Unknown packet type: {packet}")
+                        logger.warning(f"Unknown packet type: {packet}")
                     
                     # Send response if generated
                     if response:
@@ -137,16 +140,16 @@ class UAVController:
                 time.sleep(0.1)
                 
         except KeyboardInterrupt:
-            self.logger.log_info("UAV control loop stopped by user")
+            logger.info("UAV control loop stopped by user")
         except Exception as e:
-            self.logger.log_error(f"UAV control loop error: {e}")
+            logger.error(f"UAV control loop error: {e}")
         finally:
             self.shutdown()
     
     def shutdown(self):
         """Clean shutdown of all subsystems"""
         self.running = False
-        self.logger.log_info("Shutting down UAV controller")
+        logger.info("Shutting down UAV controller")
         
         try:
             self.co2_sensor.close()
@@ -154,7 +157,7 @@ class UAVController:
             self.gps.close()
             self.flight_controller.close()
         except Exception as e:
-            self.logger.log_error(f"Error during shutdown: {e}")
+            logger.error(f"Error during shutdown: {e}")
 
 if __name__ == "__main__":
     controller = UAVController()
