@@ -1,6 +1,6 @@
 """
 SprintIR-WF-20 CO₂ Sensor Reader
-UART interface to read CO₂ concentrations in ppm
+UART interface to read filtered CO₂ concentrations in ppm
 """
 
 import serial
@@ -67,18 +67,24 @@ class CO2Reader:
                 # Read response
                 response = self.serial_conn.readline().decode().strip()
                 
-                if response.startswith('z'):
-                    # Parse CO₂ value from response (format: "z 00412\r\n")
-                    co2_str = response[2:].strip()
-                    co2_value = float(co2_str)
-                    
-                    with self.lock:
-                        self.latest_co2 = co2_value
+                # Parse response format: "Z 00680 z 00659"
+                # We want the filtered value (z), which is the second value
+                if 'z' in response:
+                    parts = response.split()
+                    for i, part in enumerate(parts):
+                        if part == 'z' and i + 1 < len(parts):
+                            try:
+                                co2_value = float(parts[i + 1])
+                                with self.lock:
+                                    self.latest_co2 = co2_value
+                                break
+                            except ValueError:
+                                continue
                 
                 time.sleep(0.05)  # 20 Hz maximum reading rate
                 
             except Exception as e:
-                print(f"Error reading from SprintIR sensor: {e}")
+                logger.error(f"Error reading from SprintIR sensor: {e}")
                 time.sleep(1)  # Wait before retrying
     
     def read_co2(self) -> float:
@@ -108,9 +114,16 @@ class CO2Reader:
             # Read response with timeout
             response = self.serial_conn.readline().decode().strip()
             
-            if response.startswith('z'):
-                co2_str = response[2:].strip()
-                return float(co2_str)
+            # Parse response format: "Z 00680 z 00659"
+            # Extract the filtered value (z)
+            if 'z' in response:
+                parts = response.split()
+                for i, part in enumerate(parts):
+                    if part == 'z' and i + 1 < len(parts):
+                        try:
+                            return float(parts[i + 1])
+                        except ValueError:
+                            continue
             
         except Exception as e:
             print(f"Error in synchronous CO₂ read: {e}")

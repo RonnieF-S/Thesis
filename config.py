@@ -25,6 +25,10 @@ LORA_TIMEOUT = 5          # seconds
 GPS_TIMEOUT = 60          # seconds for fix
 SENSOR_READ_INTERVAL = 0.1  # seconds
 
+# LoRa Test Messages
+TEST_PING_MSG = "TEST_PING"
+TEST_PONG_MSG = "TEST_PONG"
+
 # System Settings
 LOG_LEVEL = 'INFO'
 DEBUG_MODE = False
